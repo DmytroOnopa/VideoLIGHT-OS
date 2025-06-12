@@ -297,42 +297,64 @@ void handleMenu() {
 }
 
 void handleAdjust() {
-  if (!digitalRead(NEXT_PIN)) {
-    switch (currentMenu) {
-      case 0:
-        brightness += 5;
-        if (brightness > 255) brightness = 16;
-        FastLED.setBrightness(brightness);
-        break;
-      case 1:
-        currentColor.r += 5;
-        if (currentColor.r > 255) currentColor.r = 0;
-        break;
-      case 2:
-        currentColor.g += 5;
-        if (currentColor.g > 255) currentColor.g = 0;
-        break;
-      case 3:
-        currentColor.b += 5;
-        if (currentColor.b > 255) currentColor.b = 0;
-        break;
-      case 4:
-        effectIndex = (effectIndex + 1) % EFFECT_COUNT;
-        break;
-      case 5:
-        invertDisplay = !invertDisplay;
-        display.invertDisplay(invertDisplay);
-        EEPROM.update(EEPROM_INVERT, invertDisplay);
-        break;
-    }
-    saveSettings();
-    drawAdjustMenu();
-    delay(200);
-  }
-  if (!digitalRead(SELECT_PIN)) {
+  static unsigned long lastAdjustTime = 0;
+  static bool wasPressed = false;
+  static int repeatDelay = 300; // Початковий інтервал
+
+  bool nextPressed = digitalRead(NEXT_PIN) == LOW;
+  bool selectPressed = digitalRead(SELECT_PIN) == LOW;
+
+  unsigned long now = millis();
+
+  // Обробка виходу через SELECT
+  if (selectPressed) {
     state = MENU;
     drawMainMenu();
-    delay(200);
+    delay(200); // захист від дрібежу
+    return;
+  }
+
+  // Обробка кнопки NEXT з утриманням
+  if (nextPressed) {
+    if (!wasPressed || (now - lastAdjustTime >= repeatDelay)) {
+      switch (currentMenu) {
+        case 0:
+          brightness += 2;
+          if (brightness > 255) brightness = 16;
+          FastLED.setBrightness(brightness);
+          break;
+        case 1:
+          currentColor.r = (currentColor.r + 1) % 256;
+          break;
+        case 2:
+          currentColor.g = (currentColor.g + 1) % 256;
+          break;
+        case 3:
+          currentColor.b = (currentColor.b + 1) % 256;
+          break;
+        case 4:
+          effectIndex = (effectIndex + 1) % EFFECT_COUNT;
+          break;
+        case 5:
+          invertDisplay = !invertDisplay;
+          display.invertDisplay(invertDisplay);
+          EEPROM.update(EEPROM_INVERT, invertDisplay);
+          break;
+      }
+
+      saveSettings();
+      drawAdjustMenu();
+
+      lastAdjustTime = now;
+      wasPressed = true;
+
+      // Зменшення затримки, щоб прискорити зміну
+      if (repeatDelay > 100) repeatDelay -= 20;
+    }
+  } else {
+    // Кнопка відпущена — ресет
+    wasPressed = false;
+    repeatDelay = 300;
   }
 }
 
