@@ -83,7 +83,7 @@ bool gameOver = false;
 int gameOverMenuIndex = 0;
 
 // Додай зверху глобальні змінні для прокрутки About
-String aboutText = "Current firmware: VideoLIGHT_5.2";
+String aboutText = "github.com/DmytroOnopa/VideoLIGHT-OS";
 int scrollPos = 0;
 unsigned long lastScrollTime = 0;
 const unsigned long scrollInterval = 100; // мс між оновленнями прокрутки
