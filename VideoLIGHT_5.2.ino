@@ -49,7 +49,7 @@ int brightness = 128;
 CRGB currentColor = CRGB::White;
 
 int effectIndex = 0;
-#define EFFECT_COUNT 5  // Кількість ефектів
+#define EFFECT_COUNT 7  // Кількість ефектів
 
 // Таймер бездіяльності
 unsigned long lastActivityTime = 0;
@@ -248,10 +248,12 @@ void drawAdjustMenu() {
 const char* effectName(int idx) {
   switch (idx) {
     case 0: return "Static";
-    case 1: return "Rainbow";
-    case 2: return "Color Flow";
-    case 3: return "Running Dot";
-    case 4: return "Confetti";
+    case 1: return "Running Dot";
+    case 2: return "Confetti";
+    case 3: return "Staboscope";
+    case 4: return "SOS Signal";
+    case 5: return "Hazard Light";
+    case 6: return "Police Mode";
     default: return "Unknown";
   }
 }
@@ -442,95 +444,180 @@ void saveSettings() {
 }
 
 void showLoadingAnimation() {
-  const char* title = "VideoLIGHT OS";
-  int len = strlen(title);
-
+  const char* text = "theGrove";
+  int len = strlen(text);
   for (int frame = 0; frame < 40; frame++) {
     display.clearDisplay();
-
-    // Лінії що рухаються зверху вниз
-    for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
-      display.drawFastHLine(0, (y + frame) % SCREEN_HEIGHT, SCREEN_WIDTH, SSD1306_WHITE);
+    // Рухомі смужки
+    for (int y = 0; y < SCREEN_HEIGHT; y += 6) {
+      display.drawFastHLine(0, (y + frame * 3) % SCREEN_HEIGHT, SCREEN_WIDTH, SSD1306_WHITE);
     }
-
-    // "Гліч"-ефект при виведенні тексту
+    // Текст з "гліч" ефектом
     display.setTextSize(2);
     display.setTextColor(SSD1306_WHITE);
     for (int i = 0; i < len; i++) {
-      if (random(0, 10) > 2 || frame > 30) {
-        display.setCursor((SCREEN_WIDTH - len * 6) / 2 + i * 6, 28);
-        display.print(title[i]);
+      int x = (SCREEN_WIDTH - len * 12) / 2 + i * 12;
+      int y = SCREEN_HEIGHT / 2 - 8;
+      if (random(10) > 7 || frame > 30) {
+        display.setCursor(x, y);
+        display.print(text[i]);
       } else {
-        // гліч
-        display.setCursor((SCREEN_WIDTH - len * 6) / 2 + i * 6, 28);
-        display.print((char)(random(33, 126)));
+        display.setCursor(x, y + random(-2,3));
+        display.print((char)random(33, 126));
       }
     }
-
     display.display();
     delay(40);
   }
-
   delay(600);
 }
 
 void updateLEDs() {
   switch (effectIndex) {
     case 0: effectStatic(); break;
-    case 1: effectRainbow(); break;
-    case 2: effectColorFlow(); break;
-    case 3: effectRunningDot(); break;
-    case 4: effectConfetti(); break;
+    case 1: effectRunningDot(); break;
+    case 2: effectConfetti(); break;
+    case 3: effectStaboscope(); break;
+    case 4: effectSOS(); break;
+    case 5: effectHazard(); break;
+    case 6: effectPolice(); break;
     default: effectStatic(); break;
   }
 }
 
 void effectStatic() {
-  // Використовуємо безпосередньо RGB колір замість перетворення з HSV
   fill_solid(leds, LED_COUNT, CRGB(currentColor.r, currentColor.g, currentColor.b));
 }
 
-void effectRainbow() {
-  static uint8_t startIndex = 0;
-  startIndex++;
-  fill_rainbow(leds, LED_COUNT, startIndex, 7);
-  FastLED.setBrightness(brightness);
-}
-
-void effectColorFlow() {
-  static uint8_t pos = 0;
-  pos += 5;  // Швидкість потоку
+// === Running Dot ===
+void effectRunningDot() {
+  static int pos = 0;
+  static unsigned long lastUpdate = 0;
   
-  for (int i = 0; i < LED_COUNT; i++) {
-    // Простий RGB цикл з використанням sin8 для плавності
-    uint8_t offset = (i * 10 + pos);
-    leds[i] = CRGB(
-      currentColor.r * (sin8(offset) + 1) >> 8,
-      currentColor.g * (sin8(offset + 85) + 1) >> 8,
-      currentColor.b * (sin8(offset + 170) + 1) >> 8
-    );
-    
-    // Застосування яскравості
-    leds[i].nscale8(brightness);
+  if (millis() - lastUpdate > 50) {
+    lastUpdate = millis();
+    fadeToBlackBy(leds, LED_COUNT, 50);
+    leds[pos] = CRGB(currentColor.r, currentColor.g, currentColor.b);
+    pos = (pos + 1) % LED_COUNT;
   }
 }
 
-// Біжить точка
-void effectRunningDot() {
-  static int pos = 0;
-  fill_solid(leds, LED_COUNT, CRGB::Black);
-  leds[pos] = CRGB(currentColor).nscale8(brightness);
-  pos = (pos + 1) % LED_COUNT;
+// === Confetti ===
+void effectConfetti() {
+  static unsigned long lastUpdate = 0;
+  if (millis() - lastUpdate > 30) {
+    lastUpdate = millis();
+    fadeToBlackBy(leds, LED_COUNT, 10);
+    int pos = random8() % LED_COUNT;
+    leds[pos] = CHSV(random8(), 255, 255);
+  }
 }
 
-// Конфетті
-void effectConfetti() {
-  fadeToBlackBy(leds, LED_COUNT, 10);
-  int pos = random8() % LED_COUNT;
-  CRGB randomColor = currentColor;
-  randomColor += CRGB(random8(), random8(), random8()); // Додаємо випадковість
-  randomColor.nscale8(200); // Зменшуємо інтенсивність
-  leds[pos] += randomColor;
+// === Staboscope ===
+void effectStaboscope() {
+  static unsigned long lastFlash = 0;
+  static int flashCount = 0;
+  static bool flashing = false;
+
+  if (!flashing) {
+    if (millis() - lastFlash > 15000) {
+      flashing = true;
+      flashCount = 0;
+    }
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+  } else {
+    if (millis() - lastFlash > 80) {
+      if (flashCount % 2 == 0) {
+        fill_solid(leds, LED_COUNT, CRGB(255, 255, 255));
+        FastLED.setBrightness(255);
+      } else {
+        fill_solid(leds, LED_COUNT, CRGB::Black);
+      }
+      flashCount++;
+      lastFlash = millis();
+
+      if (flashCount >= 18) {
+        flashing = false;
+      }
+    }
+  }
+}
+
+void effectSOS() {
+  static unsigned long t = 0;
+  static int s = 0;
+  static bool on = false;
+  const int seq[] = {200,200,200,200,200,200,600,600,600,600,600,600,200,200,200};
+  if (millis() - t < (on ? seq[s] : 200)) return;
+  t = millis();
+  on = !on;
+  if (on) fill_solid(leds, LED_COUNT, CRGB(255,80,0));
+  else {
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+    s = (s + 1) % 15;
+  }
+  FastLED.show();
+}
+
+void effectHazard() {
+  static unsigned long lastToggle = 0;
+  static bool state = false;
+
+  if (millis() - lastToggle > 500) {
+    lastToggle = millis();
+    state = !state;
+    CRGB color = state ? CRGB(255, 60, 0) : CRGB::Black;
+
+    leds[0] = leds[9] = leds[4] = leds[5] = color;
+    // Інші вимикаємо
+    for (int i = 0; i < LED_COUNT; i++) {
+      if (i != 0 && i != 4 && i != 5 && i != 9) {
+        leds[i] = CRGB::Black;
+      }
+    }
+  }
+}
+
+void effectPolice() {
+  static unsigned long lastUpdate = 0;
+  static int blinkCount = 0;
+  static bool leftSide = true;
+  static bool isOn = false;
+
+  unsigned long now = millis();
+  const int blinkInterval = 100;
+  const int pauseBetweenSides = 300;
+
+  if (now - lastUpdate >= blinkInterval) {
+    lastUpdate = now;
+
+    // Вимикаємо всі
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+
+    if (isOn) {
+      // моргаємо
+      if (leftSide) {
+        // Ліва сторона: 0, 1, 9, 8, 7
+        leds[0] = leds[1] = leds[9] = leds[8] = leds[7] = CRGB(0, 0, 255); // синій
+      } else {
+        // Права сторона: 2, 3, 4, 5, 6
+        leds[2] = leds[3] = leds[4] = leds[5] = leds[6] = CRGB(255, 0, 0); // червоний
+      }
+      blinkCount++;
+    } else {
+      // Пауза між миготінням
+    }
+
+    FastLED.show();
+    isOn = !isOn;
+
+    if (!isOn && blinkCount >= 3) {
+      // 3 блимання завершено — міняємо сторону
+      leftSide = !leftSide;
+      blinkCount = 0;
+      lastUpdate = now + pauseBetweenSides;
+    }
+  }
 }
 
 void spaceInvadersInit() {
