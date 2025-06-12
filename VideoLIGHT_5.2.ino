@@ -82,12 +82,14 @@ int invaderStepDowns = 0;
 bool gameOver = false;
 int gameOverMenuIndex = 0;
 
-// Додай зверху глобальні змінні для прокрутки About
-String aboutText = "github.com/DmytroOnopa/VideoLIGHT-OS";
-int scrollPos = 0;
-unsigned long lastScrollTime = 0;
-const unsigned long scrollInterval = 100; // мс між оновленнями прокрутки
-const int scrollSpeed = 3;     
+String aboutText = 
+  "VideoLIGHT OS v5.2\n"
+  "Current firmware:\n"
+  "github.com/DmytroOnopa/VideoLIGHT-OS\n"
+  "―\n"
+  "My contact:\n"
+  "ABTOMATAK.t.me\n"
+  "https://geniusbar.site\n";
 
 void setup() {
   pinMode(SELECT_PIN, INPUT_PULLUP);
@@ -349,46 +351,79 @@ void handleAdjust() {
       wasPressed = true;
 
       // Зменшення затримки, щоб прискорити зміну
-      if (repeatDelay > 100) repeatDelay -= 20;
+      if (repeatDelay > 50) repeatDelay -= 40;
     }
   } else {
     // Кнопка відпущена — ресет
     wasPressed = false;
-    repeatDelay = 300;
+    repeatDelay = 200;
   }
 }
 
-// Заміни існуючу функцію drawAbout() ось так:
+int scrollPosY = SCREEN_HEIGHT;  // починаємо знизу
+unsigned long lastScrollTime = 0;
+const int scrollInterval = 50;
+const int scrollSpeed = 1;
+
+int countLines(const String& str) {
+  int count = 1;
+  for (int i = 0; i < str.length(); i++) {
+    if (str.charAt(i) == '\n') count++;
+  }
+  return count;
+}
+
 void drawAbout() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
 
-  int textWidth = aboutText.length() * 6; // приблизна ширина тексту, 6 пікселів на символ (TextSize=1)
+  int lineHeight = 8;
 
-  // Малюємо текст з від'ємним зсувом scrollPos, щоб прокручувався вліво
-  display.setCursor(-scrollPos, 20);
-  display.print(aboutText);
+  int y = scrollPosY;
 
-  display.setCursor(0, 50);
+  int start = 0;
+  int end = aboutText.indexOf('\n', start);
+  while (end != -1) {
+    String line = aboutText.substring(start, end);
+    if (y >= 0 && (y + lineHeight) <= SCREEN_HEIGHT - 10) {
+     display.setCursor(0, y);
+      display.print(line);
+    }
+    y += lineHeight;
+    start = end + 1;
+    end = aboutText.indexOf('\n', start);
+  }
+// останній рядок
+  String lastLine = aboutText.substring(start);
+  if (y >= 0 && (y + lineHeight) <= SCREEN_HEIGHT - 10) {
+   display.setCursor(0, y);
+   display.print(lastLine);
+  }
+
+  // підказка внизу
+  display.setTextColor(SSD1306_WHITE);
+  display.drawLine(0, 52, SCREEN_WIDTH, 52, SSD1306_WHITE);
+  display.setCursor(0, SCREEN_HEIGHT - 8);
   display.println(F("Press SELECT to back"));
 
   display.display();
 
-  // Оновлюємо scrollPos з інтервалом
   if (millis() - lastScrollTime > scrollInterval) {
-    scrollPos += scrollSpeed;
-    if (scrollPos > textWidth + 10 + SCREEN_WIDTH) {
-      scrollPos = 0; // скидаємо прокрутку, коли текст прокрутився повністю
+    scrollPosY -= scrollSpeed;
+
+    int totalHeight = countLines(aboutText) * lineHeight;
+
+    if (scrollPosY < -totalHeight) {
+      scrollPosY = SCREEN_HEIGHT;
     }
     lastScrollTime = millis();
   }
 }
 
-// Зміни handleAbout() так, щоб вона просто повертала в меню при натисканні SELECT:
 void handleAbout() {
   if (!digitalRead(SELECT_PIN)) {
-    scrollPos = 0;  // Скидаємо прокрутку при виході
+    scrollPosY = SCREEN_HEIGHT;  // або 0 — залежно від логіки, краще починати знизу
     state = MENU;
     drawMainMenu();
     delay(200);
