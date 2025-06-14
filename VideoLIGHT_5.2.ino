@@ -38,11 +38,12 @@ const char* mainMenu[] = {
   "Green",
   "Blue",
   "Effect",
-  "Invert Display",
+  "Rotate Display",
+  "Light/Dark mode",
   "Game",
   "About"
 };
-#define MENU_COUNT 8
+#define MENU_COUNT 9
 
 bool invertDisplay = false;
 int brightness = 128;
@@ -81,6 +82,8 @@ const unsigned long invaderMoveInterval = 500; // кожні 500мс
 int invaderStepDowns = 0;
 bool gameOver = false;
 int gameOverMenuIndex = 0;
+
+bool rotateDisplay180 = false; // false — 0°, true — 180°
 
 String aboutText = 
   "VideoLIGHT OS v5.2\n"
@@ -211,7 +214,7 @@ void drawAdjustMenu() {
   
   switch (currentMenu) {
     case 0: // Brightness
-      display.print(F("Value: "));
+      display.print(F("Brightness: "));
       display.println(brightness);
       break;
     case 1: // Red
@@ -231,7 +234,7 @@ void drawAdjustMenu() {
       display.println(effectName(effectIndex));
       break;
     case 5: // Invert
-      display.print(F("Inverted: "));
+      display.print(F("Enable light mode: "));
       display.println(invertDisplay ? "Yes" : "No");
       break;
   }
@@ -283,15 +286,19 @@ void handleMenu() {
         state = ADJUST;
         drawAdjustMenu();
         break;
-      case 5:  // Invert Display
+      case 5:  // Rotate Display
+        state = ADJUST;
+        drawAdjustMenu();
+        break;
+      case 6:  // Invert Display
          state = ADJUST;
          drawAdjustMenu();
          break;
-      case 6:  // Game
+      case 7:  // Game
         state = SPACEINVADERS;
         spaceInvadersInit();
         break;
-      case 7:  // About
+      case 8:  // About
         state = ABOUT;
         drawAbout();
         break;
@@ -339,7 +346,11 @@ void handleAdjust() {
         case 4:
           effectIndex = (effectIndex + 1) % EFFECT_COUNT;
           break;
-        case 5:
+        case 5: // Rotate Display
+          rotateDisplay180 = !rotateDisplay180;
+          display.setRotation(rotateDisplay180 ? 2 : 0);  // 2 — це 180 градусів у Adafruit_SSD1306
+          break;
+        case 6: // Invert Display
           invertDisplay = !invertDisplay;
           display.invertDisplay(invertDisplay);
           EEPROM.update(EEPROM_INVERT, invertDisplay);
